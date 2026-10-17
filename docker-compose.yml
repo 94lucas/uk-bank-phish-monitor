@@ -1,0 +1,79 @@
+# Full stack for a home server (tested layout for a ZimaBlade / ZimaOS box).
+#
+#   certstream  Certificate Transparency stream (internal only)
+#   n8n         enrichment + Telegram alerts, UI on port 5678 (LAN only!)
+#   collector   Python: real-time CT monitoring and scoring
+#   dnstwist    Python: permutation scan once every 24 h
+#
+# Containers talk to each other by service name on the internal network,
+# so certstream and the webhook are never exposed outside the box.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"   # protect the eMMC / disk from runaway logs
+    max-file: "3"
+
+services:
+  certstream:
+    image: 0rickyy0/certstream-server-go:latest
+    container_name: ukphish-certstream
+    restart: unless-stopped
+    logging: *logging
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: ukphish-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Europe/London
+      - TZ=Europe/London
+      # Needed to open the UI over plain http on the LAN (http://<zimablade-ip>:5678).
+      # Do NOT expose this port to the internet.
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    logging: *logging
+
+  collector:
+    build: .
+    image: ukphish:latest
+    container_name: ukphish-collector
+    restart: unless-stopped
+    command: ["stream"]
+    env_file: .env
+    environment:
+      - CERTSTREAM_URL=ws://certstream:8080/
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/ukphish-detection
+      - TZ=Europe/London
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro    # edit brands/weights without rebuilding
+    depends_on:
+      - certstream
+      - n8n
+    logging: *logging
+
+  dnstwist:
+    build: .
+    image: ukphish:latest
+    container_name: ukphish-dnstwist
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["while true; do ukphish dnstwist; echo 'next run in 24h'; sleep 86400; done"]
+    env_file: .env
+    environment:
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/ukphish-detection
+      - TZ=Europe/London
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    depends_on:
+      - collector
+      - n8n
+    logging: *logging
+
+volumes:
+  n8n_data:

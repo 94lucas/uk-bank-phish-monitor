@@ -1,0 +1,50 @@
+# Scoring weights and thresholds. Document any change you make here in the
+# README: the reasoning behind the weights is part of the analysis.
+
+thresholds:
+  store: 40   # domains at or above this score are saved to the database
+  alert: 60   # domains at or above this score trigger an alert
+
+weights:
+  brand_keyword: 40        # exact brand keyword found in the domain
+  homoglyph_brand: 25      # brand only found after normalising look-alike characters
+  typosquat: 30            # token within edit distance of a brand keyword
+  suspicious_word: 15      # per suspicious word (capped, see below)
+  suspicious_word_cap: 45
+  punycode: 25             # internationalised (xn--) label present
+  abused_tld: 10
+  deep_subdomain: 10       # many labels, e.g. barclays.secure.login.example.com
+
+# Lures commonly seen in UK banking and APP-fraud phishing.
+suspicious_words:
+  - secure
+  - verify
+  - verification
+  - login
+  - signin
+  - account
+  - update
+  - payee
+  - refund
+  - unlock
+  - suspended
+  - support
+  - helpdesk
+  - fraud
+  - alert
+  - confirm
+  - online
+  - banking
+  - authorise
+  - fca
+  - hmrc
+
+abused_tlds: [top, xyz, shop, online, site, live, icu, cfd, sbs, click, info, buzz, vip, cyou]
+
+certstream:
+  # Public server is often unstable; running certstream-server-go locally is
+  # recommended (see docker-compose.yml).
+  url: ws://localhost:8080/
+
+database:
+  path: data/detections.db

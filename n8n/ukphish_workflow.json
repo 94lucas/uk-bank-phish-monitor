@@ -1,0 +1,143 @@
+{
+  "name": "UK Bank Phishing Monitor - Enrich & Telegram Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ukphish-detection",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "e2228355-9bf5-40bc-aa81-0d62c5998ff3",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ukphish-detection"
+    },
+    {
+      "parameters": {
+        "url": "=https://rdap.org/domain/{{ $('Webhook').item.json.body.domain }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "c38e722e-0bbb-4438-9106-fc5b159ed534",
+      "name": "RDAP lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://dns.google/resolve?name={{ $('Webhook').item.json.body.domain }}&type=A",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "64c7cb28-cc1b-4932-84da-ea3f93c2bfd6",
+      "name": "DNS lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine the detection from Python with RDAP and DNS enrichment,\n// decide whether it deserves an alert, and build the Telegram message.\n// Returning an empty array stops the workflow (no alert sent).\n\nconst d = $('Webhook').first().json.body;\nconst rdap = $('RDAP lookup').first().json || {};\nconst dns = $('DNS lookup').first().json || {};\n\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\n// --- Domain age from RDAP -------------------------------------------------\nlet registeredAt = null;\nlet ageDays = null;\nconst reg = (rdap.events || []).find(e => e.eventAction === 'registration');\nif (reg && reg.eventDate) {\n  registeredAt = reg.eventDate.slice(0, 10);\n  ageDays = Math.floor((Date.now() - new Date(reg.eventDate)) / 86400000);\n}\n\n// Registrar name (RDAP entity with the \"registrar\" role)\nlet registrar = null;\nconst regEntity = (rdap.entities || []).find(e => (e.roles || []).includes('registrar'));\nif (regEntity && regEntity.vcardArray && regEntity.vcardArray[1]) {\n  const fn = regEntity.vcardArray[1].find(f => f[0] === 'fn');\n  if (fn) registrar = fn[3];\n}\n\n// --- IPs from DNS over HTTPS ----------------------------------------------\nconst ips = (dns.Answer || []).filter(a => a.type === 1).map(a => a.data);\n\n// --- Alert decision -------------------------------------------------------\n// Alert if the Python score already crossed the alert threshold, OR if a\n// lower-scoring domain was registered in the last 7 days and already resolves.\nconst highScore = d.score >= d.alert_threshold;\nconst freshAndLive = ageDays !== null && ageDays <= 7 && ips.length > 0;\n\nif (!highScore && !freshAndLive) {\n  return [];\n}\n\nconst escalation = !highScore && freshAndLive\n  ? '\\n⚠️ <b>Escalated:</b> below alert score, but registered recently and already live.'\n  : '';\n\nconst reasons = (d.reasons || []).map(r => `• ${esc(r)}`).join('\\n');\nconst text =\n`🚨 <b>Possible ${esc(d.brand)} phishing domain</b>\n\n<b>Domain:</b> <code>${esc(d.domain_defanged)}</code>\n<b>Score:</b> ${d.score}\n<b>Source:</b> ${esc(d.source)}\n\n<b>Why:</b>\n${reasons}\n\n<b>Enrichment:</b>\n• Registered: ${registeredAt ? `${registeredAt} (${ageDays} days ago)` : 'unknown'}\n• Registrar: ${esc(registrar || 'unknown')}\n• Resolves to: ${ips.length ? esc(ips.join(', ').replace(/\\./g, '[.]')) : 'no A record'}${escalation}`;\n\nreturn [{ json: { text, domain: d.domain, brand: d.brand, score: d.score, ageDays, ips } }];\n"
+      },
+      "id": "1f41ef63-353a-470b-83ea-082debd189f4",
+      "name": "Decide & format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b9077134-cbc8-4266-aa65-0408562f20f5",
+      "name": "Telegram alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "RDAP lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RDAP lookup": {
+      "main": [
+        [
+          {
+            "node": "DNS lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DNS lookup": {
+      "main": [
+        [
+          {
+            "node": "Decide & format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide & format": {
+      "main": [
+        [
+          {
+            "node": "Telegram alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

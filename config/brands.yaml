@@ -1,0 +1,63 @@
+# UK banks monitored by the system.
+#
+# keywords:      strings that, if present in a domain, indicate impersonation.
+#                Avoid short/generic words (e.g. "metro") that cause false positives.
+# legit_domains: the brand's real domains. Any domain equal to, or a subdomain of,
+#                one of these is allowlisted and never alerted on.
+
+brands:
+  - name: Barclays
+    keywords: [barclays, barclaycard]
+    legit_domains: [barclays.co.uk, barclays.com, barclaycard.co.uk]
+
+  - name: HSBC UK
+    keywords: [hsbc]
+    legit_domains: [hsbc.co.uk, hsbc.com]
+
+  - name: Lloyds Bank
+    keywords: [lloydsbank, lloyds]
+    legit_domains: [lloydsbank.com, lloydsbankinggroup.com, lloydsbank.co.uk]
+
+  - name: NatWest
+    keywords: [natwest]
+    legit_domains: [natwest.com, natwestgroup.com]
+
+  - name: Royal Bank of Scotland
+    keywords: [royalbankofscotland, rbsdigital]
+    legit_domains: [rbs.co.uk, rbs.com]
+
+  - name: Santander UK
+    keywords: [santander]
+    legit_domains: [santander.co.uk, santander.com]
+
+  - name: Halifax
+    keywords: [halifax]
+    legit_domains: [halifax.co.uk, halifax-online.co.uk]
+
+  - name: Nationwide
+    keywords: [nationwide]
+    legit_domains: [nationwide.co.uk]
+
+  - name: TSB
+    keywords: [tsbbank, tsb-bank, tsbonline]
+    legit_domains: [tsb.co.uk]
+
+  - name: Metro Bank
+    keywords: [metrobank]
+    legit_domains: [metrobankonline.co.uk]
+
+  - name: First Direct
+    keywords: [firstdirect]
+    legit_domains: [firstdirect.com]
+
+  - name: Monzo
+    keywords: [monzo]
+    legit_domains: [monzo.com, monzo.me]
+
+  - name: Starling Bank
+    keywords: [starlingbank]
+    legit_domains: [starlingbank.com]
+
+  - name: Revolut
+    keywords: [revolut]
+    legit_domains: [revolut.com, revolut.me]

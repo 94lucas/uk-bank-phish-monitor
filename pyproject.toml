@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uk-bank-phish-monitor"
+version = "0.1.0"
+description = "Detect newly observed domains impersonating UK banks"
+requires-python = ">=3.10"
+dependencies = ["certstream>=1.12", "PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dnstwist = ["dnstwist>=20240812"]
+
+[project.scripts]
+ukphish = "ukphish.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
